@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/go-task/task/v2/internal/output"
+	"github.com/leiyangyou/task/v2/internal/output"
 
 	"github.com/stretchr/testify/assert"
 )

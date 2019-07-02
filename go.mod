@@ -1,4 +1,4 @@
-module github.com/go-task/task/v2
+module github.com/leiyangyou/task/v2
 
 require (
 	github.com/Masterminds/semver v1.4.2 // indirect

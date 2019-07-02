@@ -5,9 +5,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/go-task/task/v2/internal/logger"
-	"github.com/go-task/task/v2/internal/summary"
-	"github.com/go-task/task/v2/internal/taskfile"
+	"github.com/leiyangyou/task/v2/internal/logger"
+	"github.com/leiyangyou/task/v2/internal/summary"
+	"github.com/leiyangyou/task/v2/internal/taskfile"
 
 	"github.com/stretchr/testify/assert"
 )

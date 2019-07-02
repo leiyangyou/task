@@ -3,9 +3,9 @@ package task
 import (
 	"path/filepath"
 
-	"github.com/go-task/task/v2/internal/execext"
-	"github.com/go-task/task/v2/internal/taskfile"
-	"github.com/go-task/task/v2/internal/templater"
+	"github.com/leiyangyou/task/v2/internal/execext"
+	"github.com/leiyangyou/task/v2/internal/taskfile"
+	"github.com/leiyangyou/task/v2/internal/templater"
 )
 
 // CompiledTask returns a copy of a task, but replacing variables in almost all
