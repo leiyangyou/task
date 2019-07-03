@@ -17,9 +17,19 @@ func init() {
 	templateFuncs = sprig.TxtFuncMap()
 
 	sprigEmpty := templateFuncs["empty"].(func(interface{}) bool)
+	sprigCat := templateFuncs["cat"].(func(...interface{}) string)
 
 	empty := func(given interface {}) bool {
 		return sprigEmpty(given) || given == "<no value>"
+	}
+
+	compact := func (given ...interface{}) (list []interface{}) {
+		for _, value := range given {
+			if !empty(value) {
+				list = append(list, value)
+			}
+		}
+		return  list
 	}
 
 	taskFuncs := template.FuncMap{
@@ -52,13 +62,17 @@ func init() {
 			return given[0]
 		},
 		"empty": empty,
-		"compact": func (given ...interface{}) (list []interface{}) {
-			for _, value := range given {
-				if !empty(value) {
-					list = append(list, value)
+		"compact": compact,
+		"ccat": func (given ...interface{}) string {
+			for i, value := range given {
+				v, isString := value.(string)
+				if isString {
+					given[i] = strings.TrimSpace(v)
 				}
 			}
-			return  list
+			given = compact(given...)
+
+			return sprigCat(given...)
 		},
 		// IsSH is deprecated.
 		"IsSH": func() bool { return true },
