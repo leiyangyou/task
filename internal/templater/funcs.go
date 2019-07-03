@@ -52,6 +52,14 @@ func init() {
 			return given[0]
 		},
 		"empty": empty,
+		"compact": func (given ...interface{}) (list []interface{}) {
+			for _, value := range given {
+				if !empty(value) {
+					list = append(list, value)
+				}
+			}
+			return  list
+		},
 		// IsSH is deprecated.
 		"IsSH": func() bool { return true },
 	}
