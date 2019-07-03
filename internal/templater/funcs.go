@@ -14,6 +14,14 @@ var (
 )
 
 func init() {
+	templateFuncs = sprig.TxtFuncMap()
+
+	sprigEmpty := templateFuncs["empty"].(func(interface{}) bool)
+
+	empty := func(given interface {}) bool {
+		return sprigEmpty(given) || given == "<no value>"
+	}
+
 	taskFuncs := template.FuncMap{
 		"OS":   func() string { return runtime.GOOS },
 		"ARCH": func() string { return runtime.GOARCH },
@@ -37,6 +45,13 @@ func init() {
 			}
 			return ""
 		},
+		"default": func (d interface{}, given ...interface{}) interface{} {
+			if empty(given) || empty(given[0]) {
+				return d
+			}
+			return given[0]
+		},
+		"empty": empty,
 		// IsSH is deprecated.
 		"IsSH": func() bool { return true },
 	}
@@ -45,7 +60,6 @@ func init() {
 	taskFuncs["ToSlash"] = taskFuncs["toSlash"]
 	taskFuncs["ExeExt"] = taskFuncs["exeExt"]
 
-	templateFuncs = sprig.TxtFuncMap()
 	for k, v := range taskFuncs {
 		templateFuncs[k] = v
 	}
