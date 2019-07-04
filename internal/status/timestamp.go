@@ -19,11 +19,11 @@ func (t *Timestamp) IsUpToDate() (bool, error) {
 		return false, nil
 	}
 
-	sources, err := glob(t.Dir, t.Sources)
+	sources, err := Glob(t.Dir, t.Sources)
 	if err != nil {
 		return false, nil
 	}
-	generates, err := glob(t.Dir, t.Generates)
+	generates, err := Glob(t.Dir, t.Generates)
 	if err != nil {
 		return false, nil
 	}

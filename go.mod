@@ -5,14 +5,13 @@ require (
 	github.com/Masterminds/sprig v2.16.0+incompatible
 	github.com/aokoli/goutils v1.0.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/golang/protobuf v1.3.1 // indirect
+	github.com/fsnotify/fsnotify v1.4.7
 	github.com/google/uuid v1.0.0 // indirect
 	github.com/huandu/xstrings v1.1.0 // indirect
 	github.com/imdario/mergo v0.3.6 // indirect
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/mattn/go-zglob v0.0.1
 	github.com/mitchellh/go-homedir v1.0.0
-	github.com/radovskyb/watcher v1.0.5
 	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/crypto v0.0.0-20180830192347-182538f80094 // indirect
