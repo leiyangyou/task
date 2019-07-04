@@ -242,7 +242,7 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 			if err != nil {
 				return err
 			} else {
-				e.Logger.Errf("task: unwatching file %s", f)
+				e.Logger.VerboseErrf("task: unwatching file %s", f)
 				delete(watchedFiles, f)
 			}
 		} else {
@@ -256,7 +256,7 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 			if  err != nil {
 				return err
 			} else {
-				e.Logger.Errf("task: watching file %s", f)
+				e.Logger.VerboseErrf("task: watching file %s", f)
 				watchedFiles[f] = member
 			}
 		}
