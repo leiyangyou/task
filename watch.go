@@ -239,11 +239,11 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 	for f := range watchedFiles {
 		if _, ok := newWatchedFiles[f]; !ok {
 			err := w.Remove(f)
+			delete(watchedFiles, f)
 			if err != nil {
 				return err
 			} else {
 				e.Logger.VerboseErrf("task: unwatching file %s", f)
-				delete(watchedFiles, f)
 			}
 		} else {
 			oldWatchedFiles[f] = member
