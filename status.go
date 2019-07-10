@@ -28,16 +28,37 @@ func (e *Executor) Status(ctx context.Context, calls ...taskfile.Call) error {
 }
 
 func (e *Executor) isTaskUpToDate(ctx context.Context, t *taskfile.Task) (bool, error) {
+	var (
+		err error
+		statusResult = true
+	)
+
 	if len(t.Status) > 0 {
-		return e.isTaskUpToDateStatus(ctx, t)
+		statusResult, err = e.isTaskUpToDateStatus(ctx, t)
 	}
 
-	checker, err := e.getStatusChecker(t)
 	if err != nil {
 		return false, err
 	}
 
-	return checker.IsUpToDate()
+	var (
+		checker status.Checker
+		checkerResult = true
+	)
+
+	checker, err = e.getStatusChecker(t)
+
+	if err != nil {
+		return false, err
+	}
+
+	checkerResult, err = checker.IsUpToDate()
+
+	if err != nil {
+		return false, err
+	}
+
+	return statusResult && checkerResult, nil
 }
 
 func (e *Executor) statusOnError(t *taskfile.Task) error {
