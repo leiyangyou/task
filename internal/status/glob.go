@@ -3,6 +3,7 @@ package status
 import (
 	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/leiyangyou/task/v2/internal/execext"
 
@@ -10,45 +11,50 @@ import (
 )
 
 func Glob(dir string, globs []string) (files []string, err error) {
-	for _, g := range globs {
-		if !filepath.IsAbs(g) {
-			g = filepath.Join(dir, g)
-		}
-		g, err = execext.Expand(g)
-		if err != nil {
-			return nil, err
-		}
+	for _, gs := range globs {
+		for _, g := range strings.Split(gs, ":") {
+			if strings.Trim(g, " ") == "" {
+				continue
+			}
+			if !filepath.IsAbs(g) {
+				g = filepath.Join(dir, g)
+			}
+			g, err = execext.Expand(g)
+			if err != nil {
+				return nil, err
+			}
 
-		var exclude = false
+			var exclude = false
 
-		if g[0] == '!' {
-			exclude = true
-			g = g[1:]
-		}
-		f, err := zglob.Glob(g)
-		if err != nil {
-			continue
-		}
-		if exclude {
-			var temp = make([]string, 0)
-			for _, x := range files {
-				var found = false
+			if g[0] == '!' {
+				exclude = true
+				g = g[1:]
+			}
+			f, err := zglob.Glob(g)
+			if err != nil {
+				continue
+			}
+			if exclude {
+				var temp = make([]string, 0)
+				for _, x := range files {
+					var found = false
 
-				for _, y := range f {
-					if x == y {
-						found = true
-						break
+					for _, y := range f {
+						if x == y {
+							found = true
+							break
+						}
+					}
+
+					if !found {
+						temp = append(temp, x)
 					}
 				}
+				files = temp
 
-				if !found {
-					temp = append(temp, x)
-				}
+			} else {
+				files = append(files, f...)
 			}
-			files = temp
-
-		} else {
-			files = append(files, f...)
 		}
 	}
 	sort.Strings(files)
