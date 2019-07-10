@@ -19,7 +19,7 @@ import (
 type void struct{}
 
 const rescanTime = time.Second
-const debounceTime = time.Millisecond
+const debounceTime = 500 * time.Millisecond
 
 func (e *Executor) runCalls(calls ...taskfile.Call) (ctx context.Context, cancel context.CancelFunc) {
 	ctx, cancel = context.WithCancel(context.Background())
