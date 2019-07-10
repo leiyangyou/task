@@ -46,16 +46,20 @@ func (e *Executor) isTaskUpToDate(ctx context.Context, t *taskfile.Task) (bool, 
 		checkerResult = true
 	)
 
-	checker, err = e.getStatusChecker(t)
+	if len(t.Sources) > 0 {
+		checker, err = e.getStatusChecker(t)
 
-	if err != nil {
-		return false, err
-	}
+		if err != nil {
+			return false, err
+		}
 
-	checkerResult, err = checker.IsUpToDate()
+		checkerResult, err = checker.IsUpToDate()
 
-	if err != nil {
-		return false, err
+		if err != nil {
+			return false, err
+		}
+	} else {
+		statusResult = true
 	}
 
 	return statusResult && checkerResult, nil
