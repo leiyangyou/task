@@ -73,13 +73,14 @@ func (e *Executor) Run(ctx context.Context, calls ...taskfile.Call) error {
 
 	if e.Watch {
 		return e.watchTasks(calls...)
-	}
-
-	for _, c := range calls {
-		if err := e.RunTask(ctx, c); err != nil {
-			return err
+	} else {
+		for _, c := range calls {
+			if err := e.RunTask(ctx, c); err != nil {
+				return err
+			}
 		}
 	}
+
 	return nil
 }
 
