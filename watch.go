@@ -72,15 +72,15 @@ func (e *Executor) watchTasks(calls ...taskfile.Call) error {
 			select {
 			case event := <-w.Events:
 				if event.Op != fsnotify.Chmod {
-					e.Logger.VerboseErrf("task: received watch event: %v", event)
+					e.Logger.VerboseErrf("task: Received watch event: %v", event)
 					debounce(func () {
-						e.Logger.VerboseErrf("task: triggering rerun: %v", event)
+						e.Logger.VerboseErrf("task: Triggering rerun: %v", event)
 						cancel()
 						ctx, cancel = e.runCalls(calls...)
 					})
 				}
 			case err := <-w.Errors:
-				e.Logger.Errf("task: watcher error: %v", err)
+				e.Logger.Errf("task: Watcher error: %v", err)
 			case <-interrupted:
 				cancel()
 				cancelDebounce()
@@ -96,7 +96,7 @@ func (e *Executor) watchTasks(calls ...taskfile.Call) error {
 		// re-register each second because we can have new files
 		for {
 			if err := e.registerWatchedFiles(w, watchedFiles, calls...); err != nil {
-				e.Logger.Errf("task: file registration error: %v", err)
+				e.Logger.Errf("task: File registration error: %v", err)
 			}
 			select {
 				case <-interrupted:
@@ -192,14 +192,14 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 
 		dir, err := filepath.Abs(task.Dir)
 		if err != nil {
-			e.Logger.Errf("unable to resolve directory %v", task.Dir)
+			e.Logger.Errf("task: Unable to resolve directory %v", task.Dir)
 			return err
 		}
 
 		files, err := status.Glob(dir, task.Sources)
 
 		if err != nil {
-			e.Logger.Errf("unable to glob sources in %s: %v", task.Dir, task.Sources)
+			e.Logger.Errf("task: Unable to glob sources in %s: %v", task.Dir, task.Sources)
 			return err
 		}
 
@@ -210,7 +210,7 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 
 
 		if err != nil {
-			e.Logger.Errf("unable to glob generates in %s: %v", task.Dir, task.Sources)
+			e.Logger.Errf("task: Unable to glob generates in %s: %v", task.Dir, task.Sources)
 			return err
 		}
 
@@ -239,7 +239,7 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 			if err != nil {
 				return err
 			} else {
-				e.Logger.VerboseErrf("task: unwatching file %s", f)
+				e.Logger.VerboseErrf("task: Unwatching file %s", f)
 			}
 		} else {
 			oldWatchedFiles[f] = member
@@ -252,7 +252,7 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 			if  err != nil {
 				return err
 			} else {
-				e.Logger.VerboseErrf("task: watching file %s", f)
+				e.Logger.VerboseErrf("task: Watching file %s", f)
 				watchedFiles[f] = member
 			}
 		}
