@@ -35,10 +35,7 @@ func (e *Executor) runCalls(calls ...taskfile.Call) (ctx context.Context, cancel
 }
 
 func (e *Executor) isIgnored(file string) bool {
-	return strings.Contains(file, "/.git/") ||
-		strings.Contains(file, "/node_modules/") ||
-		strings.Contains(file, "/.")
-
+	return strings.Contains(file, "/.git/") || strings.Contains(file, "/node_modules/")
 }
 
 // watchTasks start watching the given tasks
@@ -104,6 +101,7 @@ func (e *Executor) watchTasks(calls ...taskfile.Call) error {
 			select {
 				case <-interrupted:
 					wg.Done()
+					return
 				default:
 			}
 			time.Sleep(rescanTime)
@@ -206,7 +204,6 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 		}
 
 		generated, err := status.Glob(dir, task.Generates)
-
 		for _, f := range generated {
 			generatedFiles = append(generatedFiles, f)
 		}
@@ -235,7 +232,6 @@ func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[st
 	}
 
 	oldWatchedFiles := make(map[string]void)
-
 	for f := range watchedFiles {
 		if _, ok := newWatchedFiles[f]; !ok {
 			err := w.Remove(f)
