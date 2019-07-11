@@ -10,53 +10,57 @@ import (
 	"github.com/mattn/go-zglob"
 )
 
-func Glob(dir string, globs []string) (files []string, err error) {
-	for _, gs := range globs {
-		for _, g := range strings.Split(gs, ":") {
-			if strings.Trim(g, " ") == "" {
+func Glob(dir string, globs []string) ([]string, error) {
+	var included []string
+	var excluded = make(map[string]struct{}, 0)
+
+	for _, glob := range globs {
+		for _, globPart := range strings.Split(glob, ":") {
+			if strings.Trim(globPart, " ") == "" {
 				continue
 			}
-			if !filepath.IsAbs(g) {
-				g = filepath.Join(dir, g)
+			var exclude = false
+
+			if globPart[0] == '!' {
+				exclude = true
+				globPart = globPart[1:]
 			}
-			g, err = execext.Expand(g)
+
+			globPart, err := execext.Expand(globPart)
+
+			if !filepath.IsAbs(globPart) {
+				globPart = filepath.Join(dir, globPart)
+			}
+
 			if err != nil {
 				return nil, err
 			}
 
-			var exclude = false
+			files, err := zglob.Glob(globPart)
 
-			if g[0] == '!' {
-				exclude = true
-				g = g[1:]
-			}
-			f, err := zglob.Glob(g)
 			if err != nil {
-				continue
+				return nil, err
 			}
+
 			if exclude {
-				var temp = make([]string, 0)
-				for _, x := range files {
-					var found = false
-
-					for _, y := range f {
-						if x == y {
-							found = true
-							break
-						}
-					}
-
-					if !found {
-						temp = append(temp, x)
-					}
+				for _, f := range files {
+					excluded[f] = struct{}{}
 				}
-				files = temp
-
 			} else {
-				files = append(files, f...)
+				included = append(included, files...)
 			}
 		}
 	}
+
+	var files = make([]string, 0)
+
+	for _, f := range included {
+		if _, ok := excluded[f]; !ok {
+			files = append(files, f)
+		}
+	}
+
 	sort.Strings(files)
-	return
+
+	return files, nil
 }
