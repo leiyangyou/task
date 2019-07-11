@@ -5,9 +5,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/bmatcuk/doublestar"
 	"github.com/leiyangyou/task/v2/internal/execext"
-
-	"github.com/mattn/go-zglob"
 )
 
 func Glob(dir string, globs []string) ([]string, error) {
@@ -19,24 +18,23 @@ func Glob(dir string, globs []string) ([]string, error) {
 			if strings.Trim(globPart, " ") == "" {
 				continue
 			}
-			var exclude = false
 
+			var exclude = false
 			if globPart[0] == '!' {
 				exclude = true
 				globPart = globPart[1:]
 			}
 
 			globPart, err := execext.Expand(globPart)
+			if err != nil {
+				return nil, err
+			}
 
 			if !filepath.IsAbs(globPart) {
 				globPart = filepath.Join(dir, globPart)
 			}
 
-			if err != nil {
-				return nil, err
-			}
-
-			files, err := zglob.Glob(globPart)
+			files, err := doublestar.Glob(globPart)
 
 			if err != nil {
 				return nil, err
