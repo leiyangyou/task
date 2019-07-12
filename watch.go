@@ -118,7 +118,67 @@ func getWatchPathsFromGlobs(dir string, globs []string) ([]string, error) {
 	return paths, nil
 }
 
-// Sort is a convenience method.
+func normalizePath(path string) string {
+	if !(path == "." || strings.HasPrefix(path, "/") || strings.HasPrefix(path, "./"))  {
+		path = "./" + path
+	}
+	return path
+}
+
+func pathIncludes(path string, another string) bool {
+	pathRecursive := filepath.Base(path) == "..."
+	anotherRecursive := filepath.Base(another) == "..."
+
+	if pathRecursive {
+		path = filepath.Dir(path)
+	}
+
+	if anotherRecursive {
+		another = filepath.Dir(path)
+	}
+
+	path = normalizePath(path)
+	another = normalizePath(another)
+
+	if pathRecursive {
+		return strings.HasPrefix(another, path)
+	} else {
+		return path == normalizePath(filepath.Dir(another)) && !anotherRecursive
+	}
+}
+func reduceWatchPaths(paths []string) []string {
+	resultPathMap := make(map[string]void)
+
+	for _, p := range paths {
+		include := true
+
+		if p == "" {
+			continue
+		}
+
+		for r := range resultPathMap {
+			if pathIncludes(r, p) {
+				include = false
+				break
+			} else if pathIncludes(p, r) {
+				delete(resultPathMap, r)
+			}
+		}
+
+		if include {
+			resultPathMap[p] = void{}
+		}
+	}
+
+	var results []string
+
+	for r := range resultPathMap {
+		results = append(results, r)
+	}
+
+	return results
+}
+
 
 func (e *Executor) getTaskWatchPaths(call taskfile.Call) ([]string, error) {
 	watchedPaths := make(map[string]void)
@@ -149,7 +209,7 @@ func (e *Executor) getTaskWatchPaths(call taskfile.Call) ([]string, error) {
 		paths = append(paths, path)
 	}
 
-	sort.Sort(sort.Reverse(sort.StringSlice(paths)))
+	paths = reduceWatchPaths(paths)
 
 	return paths, nil
 }
@@ -255,7 +315,7 @@ func newWatcher() *watcher {
 // caller should be able to stop the routine
 // caller should be able to know that the routine has completed
 func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
-	ctx, cancel := e.runCalls(call)
+	_, cancel := e.runCalls(call)
 
 	w := newWatcher()
 	defer w.close()
@@ -278,7 +338,7 @@ func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
 					e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
 
 					cancel()
-					ctx, cancel = e.runCalls(call)
+					_, cancel = e.runCalls(call)
 
 					err = w.rewatch(e, call)
 					if err != nil {
