@@ -211,6 +211,8 @@ func (e *Executor) getTaskWatchPaths(call taskfile.Call) ([]string, error) {
 
 	paths = reduceWatchPaths(paths)
 
+	sort.Sort(sort.Reverse(sort.StringSlice(paths)))
+
 	return paths, nil
 }
 
@@ -264,29 +266,52 @@ func (e *Executor) isTaskDependency(call taskfile.Call, path string) bool {
 type watcher struct {
 	events chan notify.EventInfo
 	mu sync.Mutex
+	watchPaths []string
 }
 
-func (r *watcher) rewatch(e *Executor, call taskfile.Call) error {
+func (r *watcher) rewatchPaths(e *Executor, call taskfile.Call, watchPaths []string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	r.watchPaths = watchPaths
+
 	r.reallyClose()
 
-	r.events = make(chan notify.EventInfo)
+	r.events = make(chan notify.EventInfo, 9)
 
+	for _, watchPath := range watchPaths {
+		e.Logger.VerboseOutf("task: Watching %s for %s", watchPath, call.Task)
+		err := notify.Watch(watchPath, r.events, notify.All)
+		if err != nil {
+			e.Logger.Errf("task: Unable to watch %s for %s", watchPath, call.Task)
+		}
+	}
+
+	return nil
+}
+
+func (r *watcher)rewatch(e *Executor, call taskfile.Call) error {
 	watchPaths, err := e.getTaskWatchPaths(call)
+
 	if err != nil {
 		return err
 	}
 
-	e.Logger.Outf("task: Started watching %s", call.Task)
+	shouldRewatch := false
 
-	for _, watchPath := range watchPaths {
-		e.Logger.VerboseOutf("task: Watching %s for %s", watchPath, call.Task)
-		err = notify.Watch(watchPath, r.events, notify.All)
-		if err != nil {
-			e.Logger.Errf("task: Unable to watch %s for %s", watchPath, call.Task)
+	if len(r.watchPaths) != len(watchPaths) {
+		shouldRewatch = true
+	} else {
+		for i, v := range watchPaths {
+			if r.watchPaths[i] != v {
+				shouldRewatch = true
+				break
+			}
 		}
+	}
+
+	if shouldRewatch {
+		return r.rewatchPaths(e, call, watchPaths)
 	}
 
 	return nil
@@ -320,6 +345,8 @@ func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
 	w := newWatcher()
 	defer w.close()
 
+	e.Logger.Outf("task: Started watching %s", call.Task)
+
 	err := w.rewatch(e, call)
 	if err != nil {
 		return err
@@ -332,17 +359,18 @@ func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
 	for {
 		select {
 		case event := <-w.events:
-			if event != nil && e.isTaskDependency(call, event.Path()) {
-				e.Logger.VerboseOutf("task: Received watch event: %v for %s", event, call.Task)
+			if event != nil {
 				debounce(func() {
-					e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
+					if e.isTaskDependency(call, event.Path()) {
+						e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
 
-					cancel()
-					_, cancel = e.runCalls(call)
+						cancel()
+						_, cancel = e.runCalls(call)
 
-					err = w.rewatch(e, call)
-					if err != nil {
-						errc <- err
+						err = w.rewatch(e, call)
+						if err != nil {
+							errc <- err
+						}
 					}
 				})
 			}
