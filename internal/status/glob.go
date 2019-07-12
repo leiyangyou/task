@@ -5,49 +5,67 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/bmatcuk/doublestar"
 	"github.com/leiyangyou/task/v2/internal/execext"
+
+	"github.com/bmatcuk/doublestar"
 )
+
+func VisitGlobs(dir string, globs []string, visit func(glob string, exclude bool) error) error {
+	for _, glob := range globs {
+		for _, subGlob := range strings.Split(glob, ":") {
+			if strings.Trim(subGlob, " ") == "" {
+				continue
+			}
+
+			var exclude = false
+			if subGlob[0] == '!' {
+				exclude = true
+				subGlob = subGlob[1:]
+			}
+
+			if !filepath.IsAbs(subGlob) {
+				subGlob = filepath.Join(dir, subGlob)
+			}
+
+			subGlob, err := execext.Expand(subGlob)
+			if err != nil {
+				return err
+			}
+
+			err = visit(subGlob, exclude)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
 
 func Glob(dir string, globs []string) ([]string, error) {
 	var included []string
 	var excluded = make(map[string]struct{}, 0)
 
-	for _, glob := range globs {
-		for _, globPart := range strings.Split(glob, ":") {
-			if strings.Trim(globPart, " ") == "" {
-				continue
-			}
+	err := VisitGlobs(dir, globs, func(glob string, exclude bool) error {
+		files, err := doublestar.Glob(glob)
 
-			var exclude = false
-			if globPart[0] == '!' {
-				exclude = true
-				globPart = globPart[1:]
-			}
-
-			globPart, err := execext.Expand(globPart)
-			if err != nil {
-				return nil, err
-			}
-
-			if !filepath.IsAbs(globPart) {
-				globPart = filepath.Join(dir, globPart)
-			}
-
-			files, err := doublestar.Glob(globPart)
-
-			if err != nil {
-				return nil, err
-			}
-
-			if exclude {
-				for _, f := range files {
-					excluded[f] = struct{}{}
-				}
-			} else {
-				included = append(included, files...)
-			}
+		if err != nil {
+			return err
 		}
+
+		if exclude {
+			for _, f := range files {
+				excluded[f] = struct{}{}
+			}
+		} else {
+			included = append(included, files...)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	var files = make([]string, 0)

@@ -20,7 +20,7 @@ tasks:
     cmds:
       - go install -v -ldflags="-w -s -X main.version={{.GIT_COMMIT}}" ./cmd/task
     env:
-      CGO_ENABLED: '0'
+      CGO_ENABLED: '1'
 
   dl-deps:
     desc: Downloads cli dependencies

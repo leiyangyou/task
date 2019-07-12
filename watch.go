@@ -5,20 +5,19 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/leiyangyou/task/v2/internal/taskfile"
 	"github.com/leiyangyou/task/v2/internal/status"
-	"github.com/fsnotify/fsnotify"
+	"github.com/leiyangyou/task/v2/internal/taskfile"
+	"github.com/rjeczalik/notify"
 )
-
 
 type void struct{}
 
-const rescanTime = time.Second
 const debounceTime = 500 * time.Millisecond
 
 func (e *Executor) runCalls(calls ...taskfile.Call) (ctx context.Context, cancel context.CancelFunc) {
@@ -38,83 +37,293 @@ func (e *Executor) isIgnored(file string) bool {
 	return strings.Contains(file, "/.git/") || strings.Contains(file, "/node_modules/")
 }
 
-// watchTasks start watching the given tasks
-func (e *Executor) watchTasks(calls ...taskfile.Call) error {
-	interrupted := make(chan void)
-	wg := sync.WaitGroup{}
-	wg.Add(2)
+func (e *Executor) walkTask(call taskfile.Call, visit func(*taskfile.Task) error) error {
+	task, err := e.CompiledTask(call)
 
-	tasks := make([]string, len(calls))
-	for i, c := range calls {
-		tasks[i] = c.Task
-	}
-
-	ctx, cancel := e.runCalls(calls...)
-
-	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		e.Logger.Errf("task: Unable to start watcher")
 		return err
-	} else {
-		e.Logger.Errf("task: Started watching for tasks: %s", strings.Join(tasks, ", "))
 	}
 
-	defer func(){
-		_ = w.Close()
-	}()
+	for _, d := range task.Deps {
+		err := e.walkTask(taskfile.Call{Task: d.Task, Vars: d.Vars}, visit)
 
-	closeOnInterrupt(interrupted)
+		if err != nil {
+			return err
+		}
+	}
 
-	debounce, cancelDebounce := newDebouncer(debounceTime)
-
-	go func() {
-		for {
-			select {
-			case event := <-w.Events:
-				if event.Op != fsnotify.Chmod {
-					e.Logger.VerboseErrf("task: Received watch event: %v", event)
-					debounce(func () {
-						e.Logger.VerboseErrf("task: Triggering rerun: %v", event)
-						cancel()
-						ctx, cancel = e.runCalls(calls...)
-					})
-				}
-			case err := <-w.Errors:
-				e.Logger.Errf("task: Watcher error: %v", err)
-			case <-interrupted:
-				cancel()
-				cancelDebounce()
-				wg.Done()
-				return
+	for _, c := range task.Cmds {
+		if c.Task != "" {
+			err := e.walkTask(taskfile.Call{Task: c.Task, Vars: c.Vars}, visit)
+			if err != nil {
+				return err
 			}
 		}
-	}()
+	}
 
-	go func() {
-		watchedFiles := make(map[string]void)
+	err = visit(task)
 
-		// re-register each second because we can have new files
-		for {
-			if err := e.registerWatchedFiles(w, watchedFiles, calls...); err != nil {
-				e.Logger.Errf("task: File registration error: %v", err)
-			}
-			select {
-				case <-interrupted:
-					wg.Done()
-					return
-				default:
-			}
-			time.Sleep(rescanTime)
-		}
-	}()
-
-	wg.Wait()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
 
-type debouncer struct {
+func getWatchPathsFromGlobs(dir string, globs []string) ([]string, error) {
+	var paths []string
+
+	err := status.VisitGlobs(dir, globs, func(glob string, exclude bool) error {
+		if !exclude {
+			paths = append(paths, glob)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// best effort at generating watch paths
+	for i, path := range paths {
+		hasDoubleStar := strings.Index(path, "**") >= 0
+
+		metaCharIndexes := []int{
+			strings.Index(path, "*"),
+			strings.Index(path, "?"),
+			strings.Index(path, "["),
+			strings.Index(path, "{"),
+		}
+
+		sort.Sort(sort.Reverse(sort.IntSlice(metaCharIndexes)))
+
+		minMetaCharIndex := metaCharIndexes[0]
+
+		hasMeta := minMetaCharIndex >= 0
+
+		if hasMeta {
+			path = path[:minMetaCharIndex]
+		}
+
+		if hasDoubleStar {
+			path = filepath.Dir(path) + "/..."
+		} else if hasMeta {
+			path = filepath.Dir(path)
+		}
+
+		paths[i] = path
+	}
+
+	return paths, nil
+}
+
+// Sort is a convenience method.
+
+func (e *Executor) getTaskWatchPaths(call taskfile.Call) ([]string, error) {
+	watchedPaths := make(map[string]void)
+
+	err := e.walkTask(call, func(task *taskfile.Task) error {
+
+		files, err := getWatchPathsFromGlobs(task.Dir, task.Sources)
+		for _, f := range files {
+			watchedPaths[f] = void{}
+		}
+
+		if err != nil {
+			e.Logger.Errf("task: Unable to determine watch paths for %s: sources: %v, %v", task.Task, task.Sources, err)
+			return err
+		}
+
+		return nil
+
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var paths []string
+
+	for path := range watchedPaths {
+		paths = append(paths, path)
+	}
+
+	sort.Sort(sort.Reverse(sort.StringSlice(paths)))
+
+	return paths, nil
+}
+
+func (e *Executor) isTaskDependency(call taskfile.Call, path string) bool {
+	if e.isIgnored(path) {
+		return false
+	}
+
+	var dependencies = make(map[string]void)
+	var generated []string
+
+	err := e.walkTask(call, func(task *taskfile.Task) error {
+		dir, err := filepath.Abs(task.Dir)
+		if err != nil {
+			e.Logger.Errf("task: Unable to resolve directory %v", task.Dir)
+			return err
+		}
+		files, err := status.Glob(dir, task.Sources)
+		if err != nil {
+			return err
+		}
+
+		for _, f := range files {
+			dependencies[f] = void{}
+		}
+
+		files, err = status.Glob(dir, task.Generates)
+
+		if err != nil {
+			return err
+		}
+
+		generated = append(generated, files...)
+
+		return nil
+	})
+
+	for _, f := range generated {
+		delete(dependencies, f)
+	}
+
+	if err != nil {
+		e.Logger.Errf("task: Unable to determine whether %s is a dependency for %v", path, call)
+		return false
+	} else {
+		_, ok := dependencies[path]
+		return ok
+	}
+}
+
+type watcher struct {
+	events chan notify.EventInfo
 	mu sync.Mutex
+}
+
+func (r *watcher) rewatch(e *Executor, call taskfile.Call) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.reallyClose()
+
+	r.events = make(chan notify.EventInfo)
+
+	watchPaths, err := e.getTaskWatchPaths(call)
+	if err != nil {
+		return err
+	}
+
+	e.Logger.Outf("task: Started watching %s", call.Task)
+
+	for _, watchPath := range watchPaths {
+		e.Logger.VerboseOutf("task: Watching %s for %s", watchPath, call.Task)
+		err = notify.Watch(watchPath, r.events, notify.All)
+		if err != nil {
+			e.Logger.Errf("task: Unable to watch %s for %s", watchPath, call.Task)
+		}
+	}
+
+	return nil
+}
+
+func (r *watcher) reallyClose() {
+	events := r.events
+	if events != nil {
+		notify.Stop(events)
+		close(events)
+	}
+}
+
+func (r *watcher) close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.reallyClose()
+}
+
+func newWatcher() *watcher {
+	return &watcher{}
+}
+// start watching a call
+// runs a call, reruns when a dependent file changes
+// caller should be able to stop the routine
+// caller should be able to know that the routine has completed
+func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
+	ctx, cancel := e.runCalls(call)
+
+	w := newWatcher()
+	defer w.close()
+
+	err := w.rewatch(e, call)
+	if err != nil {
+		return err
+	}
+
+	debounce, cancelDebounce := newDebouncer(debounceTime)
+
+	errc := make(chan error)
+
+	for {
+		select {
+		case event := <-w.events:
+			if event != nil && e.isTaskDependency(call, event.Path()) {
+				e.Logger.VerboseOutf("task: Received watch event: %v for %s", event, call.Task)
+				debounce(func() {
+					e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
+
+					cancel()
+					ctx, cancel = e.runCalls(call)
+
+					err = w.rewatch(e, call)
+					if err != nil {
+						errc <- err
+					}
+				})
+			}
+		case err := <- errc:
+			cancel()
+			cancelDebounce()
+			return err
+		case <-interrupted:
+			cancel()
+			cancelDebounce()
+			return nil
+		}
+	}
+}
+
+// watchTasks start watching the given tasks
+func (e *Executor) watchTasks(calls ...taskfile.Call) error {
+	interrupted := make(chan void)
+	closeOnInterrupt(interrupted)
+
+	wg := sync.WaitGroup{}
+
+	watchTask := func(call taskfile.Call) {
+		err := e.watchTask(interrupted, call)
+		if err != nil {
+			e.Logger.Errf("task: Unable to watch task %s", call.Task)
+		}
+		wg.Done()
+	}
+
+	for _, call := range calls {
+		wg.Add(1)
+		go watchTask(call)
+	}
+
+	wg.Wait()
+	return nil
+}
+
+type debouncer struct {
+	mu    sync.Mutex
 	after time.Duration
 	timer *time.Timer
 }
@@ -123,10 +332,10 @@ func newDebouncer(after time.Duration) (func(f func()), func()) {
 	d := &debouncer{after: after}
 
 	return func(f func()) {
-		d.add(f)
-	}, func() {
-		d.cancel()
-	}
+			d.add(f)
+		}, func() {
+			d.cancel()
+		}
 }
 
 func (d *debouncer) add(f func()) {
@@ -162,101 +371,3 @@ func closeOnInterrupt(interrupted chan void) {
 	}()
 }
 
-
-
-func (e *Executor) registerWatchedFiles(w *fsnotify.Watcher, watchedFiles map[string]void, calls ...taskfile.Call) error {
-	member := void{}
-
-	newWatchedFiles := make(map[string]void)
-	generatedFiles := make([]string, 0)
-
-	var registerTaskFiles func(taskfile.Call) error
-	registerTaskFiles = func(c taskfile.Call) error {
-		task, err := e.CompiledTask(c)
-		if err != nil {
-			return err
-		}
-
-		for _, d := range task.Deps {
-			if err := registerTaskFiles(taskfile.Call{Task: d.Task, Vars: d.Vars}); err != nil {
-				return err
-			}
-		}
-		for _, c := range task.Cmds {
-			if c.Task != "" {
-				if err := registerTaskFiles(taskfile.Call{Task: c.Task, Vars: c.Vars}); err != nil {
-					return err
-				}
-			}
-		}
-
-		dir, err := filepath.Abs(task.Dir)
-		if err != nil {
-			e.Logger.Errf("task: Unable to resolve directory %v", task.Dir)
-			return err
-		}
-
-		files, err := status.Glob(dir, task.Sources)
-
-		if err != nil {
-			e.Logger.Errf("task: Unable to glob sources in %s: %v", task.Dir, task.Sources)
-			return err
-		}
-
-		generated, err := status.Glob(dir, task.Generates)
-		for _, f := range generated {
-			generatedFiles = append(generatedFiles, f)
-		}
-
-
-		if err != nil {
-			e.Logger.Errf("task: Unable to glob generates in %s: %v", task.Dir, task.Sources)
-			return err
-		}
-
-		for _, f := range files {
-			newWatchedFiles[f] = member
-		}
-
-		return nil
-	}
-
-	for _, c := range calls {
-		if err := registerTaskFiles(c); err != nil {
-			return err
-		}
-	}
-
-	for _, f := range generatedFiles {
-		delete(newWatchedFiles, f)
-	}
-
-	oldWatchedFiles := make(map[string]void)
-	for f := range watchedFiles {
-		if _, ok := newWatchedFiles[f]; !ok {
-			err := w.Remove(f)
-			delete(watchedFiles, f)
-			if err != nil {
-				return err
-			} else {
-				e.Logger.VerboseErrf("task: Unwatching file %s", f)
-			}
-		} else {
-			oldWatchedFiles[f] = member
-		}
-	}
-
-	for f := range newWatchedFiles {
-		if _, ok := oldWatchedFiles[f]; !ok && !e.isIgnored(f){
-			err := w.Add(f)
-			if  err != nil {
-				return err
-			} else {
-				e.Logger.VerboseErrf("task: Watching file %s", f)
-				watchedFiles[f] = member
-			}
-		}
-	}
-
-	return nil
-}
