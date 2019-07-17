@@ -2,6 +2,7 @@ package templater
 
 import (
 	"bytes"
+	"log"
 	"text/template"
 
 	"github.com/leiyangyou/task/v2/internal/taskfile"
@@ -25,6 +26,7 @@ func (r *Templater) Replace(str string) string {
 
 	templ, err := template.New("").Funcs(templateFuncs).Parse(str)
 	if err != nil {
+		log.Printf("invalid template: %v", str)
 		r.err = err
 		return ""
 	}
