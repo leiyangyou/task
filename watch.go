@@ -365,7 +365,9 @@ func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
 						e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
 
 						cancel()
-						e.Compiler.Reset()
+						if e.Taskfile.ResetVarsOnRerun {
+							e.Compiler.Reset()
+						}
 						_, cancel = e.runCalls(call)
 
 						err = w.rewatch(e, call)

@@ -9,6 +9,7 @@ type Taskfile struct {
 	Vars       Vars
 	Env        Vars
 	Tasks      Tasks
+	ResetVarsOnRerun bool
 }
 
 // UnmarshalYAML implements yaml.Unmarshaler interface
@@ -26,7 +27,11 @@ func (tf *Taskfile) UnmarshalYAML(unmarshal func(interface{}) error) error {
 		Vars       Vars
 		Env        Vars
 		Tasks      Tasks
+		ResetVarsOnRerun bool `yaml:"reset-vars-on-rerun"`
 	}
+
+	taskfile.ResetVarsOnRerun = true
+
 	if err := unmarshal(&taskfile); err != nil {
 		return err
 	}
@@ -37,6 +42,7 @@ func (tf *Taskfile) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	tf.Vars = taskfile.Vars
 	tf.Env = taskfile.Env
 	tf.Tasks = taskfile.Tasks
+	tf.ResetVarsOnRerun = taskfile.ResetVarsOnRerun
 	if tf.Expansions <= 0 {
 		tf.Expansions = 2
 	}
