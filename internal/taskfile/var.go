@@ -13,6 +13,20 @@ var (
 // Vars is a string[string] variables map.
 type Vars map[string]Var
 
+func (vs Vars) Merge(another Vars) Vars {
+	var result Vars = make(map[string]Var)
+
+	for k, v := range vs {
+		result[k] = v
+	}
+
+	for k, v := range another {
+		result[k] = v
+	}
+
+	return result
+}
+
 // ToStringMap converts Vars to a string map containing only the static
 // variables
 func (vs Vars) ToStringMap() (m map[string]string) {
