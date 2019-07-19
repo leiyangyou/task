@@ -277,7 +277,7 @@ func (r *watcher) rewatchPaths(e *Executor, call taskfile.Call, watchPaths []str
 
 	r.reallyClose()
 
-	r.events = make(chan notify.EventInfo, 9)
+	r.events = make(chan notify.EventInfo, 30)
 
 	for _, watchPath := range watchPaths {
 		e.Logger.VerboseOutf("task: Watching %s for %s", watchPath, call.Task)
@@ -365,6 +365,7 @@ func (e *Executor) watchTask(interrupted chan void, call taskfile.Call) error {
 						e.Logger.VerboseOutf("task: Triggering rerun of %v due to event %v", call.Task, event)
 
 						cancel()
+						e.Compiler.Reset()
 						_, cancel = e.runCalls(call)
 
 						err = w.rewatch(e, call)

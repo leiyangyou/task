@@ -30,6 +30,12 @@ type CompilerV2 struct {
 	muDynamicCache sync.Mutex
 }
 
+func (c *CompilerV2) Reset() {
+	c.muDynamicCache.Lock()
+	defer c.muDynamicCache.Unlock()
+	c.dynamicCache = nil
+}
+
 // GetVariables returns fully resolved variables following the priority order:
 // 1. Task variables
 // 2. Call variables
