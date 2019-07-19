@@ -63,7 +63,16 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 		if info.IsDir() {
 			includedPath = filepath.Join(includedPath, "Taskfile.yml")
 		}
-		includedTaskfile, err := Taskfile(includedPath, append(namespaces, includedNamespace)...)
+
+		var includedNamespaces []string
+
+		if includedNamespace == "." {
+			includedNamespaces = namespaces
+		} else {
+			includedNamespaces = append(namespaces, includedNamespace)
+		}
+
+		includedTaskfile, err := Taskfile(includedPath, includedNamespaces...)
 		if err != nil {
 			return nil, err
 		}
@@ -99,5 +108,12 @@ func taskNameWithNamespace(taskName string, namespaces ...string) string {
 	if strings.HasPrefix(taskName, NamespaceSeparator) {
 		return strings.TrimPrefix(taskName, NamespaceSeparator)
 	}
+
+	if len(namespaces) > 0 {
+		if taskName == namespaces[len(namespaces) - 1] {
+			namespaces = namespaces[:len(namespaces) -1]
+		}
+	}
+
 	return strings.Join(append(namespaces, taskName), NamespaceSeparator)
 }
