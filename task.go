@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -87,7 +88,7 @@ func (e *Executor) Run(ctx context.Context, calls ...taskfile.Call) error {
 // Setup setups Executor's internal state
 func (e *Executor) Setup() error {
 	var err error
-	e.Taskfile, err = read.Taskfile(e.Dir)
+	e.Taskfile, err = read.Taskfile(filepath.Join(e.Dir, "Taskfile.yml"))
 	if err != nil {
 		return err
 	}
