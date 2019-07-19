@@ -66,7 +66,7 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 
 		var includedNamespaces []string
 
-		if includedNamespace == "." {
+		if strings.HasPrefix(includedNamespace, ".") {
 			includedNamespaces = namespaces
 		} else {
 			includedNamespaces = append(namespaces, includedNamespace)
