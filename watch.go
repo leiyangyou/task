@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -109,7 +110,7 @@ func getWatchPathsFromGlobs(dir string, globs []string) ([]string, error) {
 		if hasDoubleStar {
 			path = filepath.Dir(path) + "/..."
 		} else if hasMeta {
-			path = filepath.Dir(path)
+			path = filepath.Dir(path) + "/"
 		}
 
 		paths[i] = path
@@ -118,7 +119,7 @@ func getWatchPathsFromGlobs(dir string, globs []string) ([]string, error) {
 	return paths, nil
 }
 
-func normalizePath(path string) string {
+func maybePrefixWithCurrentPath(path string) string {
 	if !(path == "." || strings.HasPrefix(path, "/") || strings.HasPrefix(path, "./"))  {
 		path = "./" + path
 	}
@@ -126,25 +127,24 @@ func normalizePath(path string) string {
 }
 
 func pathIncludes(path string, another string) bool {
+	path = maybePrefixWithCurrentPath(path)
+	another = maybePrefixWithCurrentPath(another)
+
 	pathRecursive := filepath.Base(path) == "..."
 	anotherRecursive := filepath.Base(another) == "..."
 
 	if pathRecursive {
-		path = filepath.Dir(path)
+		path = maybePrefixWithCurrentPath(filepath.Dir(path) + "/")
 	}
 
 	if anotherRecursive {
-		another = filepath.Dir(path)
+		another = maybePrefixWithCurrentPath(filepath.Dir(another) + "/")
 	}
 
-	path = normalizePath(path)
-	another = normalizePath(another)
+	pathIsDir := strings.HasSuffix(path, "/")
+	anotherIsDir := strings.HasSuffix(another, "/")
 
-	if pathRecursive {
-		return strings.HasPrefix(another, path)
-	} else {
-		return path == normalizePath(filepath.Dir(another)) && !anotherRecursive
-	}
+	return strings.HasPrefix(another, path) && pathRecursive || (pathIsDir && !anotherIsDir)
 }
 func reduceWatchPaths(paths []string) []string {
 	resultPathMap := make(map[string]void)
@@ -250,14 +250,14 @@ func (e *Executor) isTaskDependency(call taskfile.Call, path string) bool {
 		return nil
 	})
 
-	for _, f := range generated {
-		delete(dependencies, f)
-	}
-
 	if err != nil {
 		e.Logger.Errf("task: Unable to determine whether %s is a dependency for %v", path, call)
 		return false
 	} else {
+		for _, f := range generated {
+			delete(dependencies, f)
+		}
+
 		_, ok := dependencies[path]
 		return ok
 	}
