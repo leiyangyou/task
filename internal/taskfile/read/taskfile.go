@@ -37,26 +37,31 @@ func Taskfile(path string, parentVars taskfile.Vars, namespaces ...string) (*tas
 	for _, name := range taskNames {
 		task := t.Tasks[name]
 
-		nameWithNamespace := taskNameWithNamespace(name, namespaces...)
+		if task != nil {
+			nameWithNamespace := taskNameWithNamespace(name, namespaces...)
 
-		if nameWithNamespace != name {
-			delete(t.Tasks, name)
-			t.Tasks[nameWithNamespace] = task
-		}
-
-		for _, dep := range task.Deps {
-			dep.Task = taskNameWithNamespace(dep.Task, namespaces...)
-		}
-
-		for _, cmd := range task.Cmds {
-			if cmd.Task != "" {
-				cmd.Task = taskNameWithNamespace(cmd.Task, namespaces...)
+			if nameWithNamespace != name {
+				delete(t.Tasks, name)
+				t.Tasks[nameWithNamespace] = task
 			}
+
+
+			for _, dep := range task.Deps {
+				dep.Task = taskNameWithNamespace(dep.Task, namespaces...)
+			}
+
+			for _, cmd := range task.Cmds {
+				if cmd.Task != "" {
+					cmd.Task = taskNameWithNamespace(cmd.Task, namespaces...)
+				}
+			}
+
+			task.TaskfileVars = t.Vars
+
+			task.Task = nameWithNamespace
+		} else {
+			delete(t.Tasks, name)
 		}
-
-		task.TaskfileVars = t.Vars
-
-		task.Task = nameWithNamespace
 	}
 
 	for includedNamespace, includedPath := range t.Includes {
