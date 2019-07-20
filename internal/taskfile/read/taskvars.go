@@ -48,5 +48,12 @@ func readTaskvars(file string) (taskfile.Vars, error) {
 		return nil, err
 	}
 	var vars taskfile.Vars
-	return vars, yaml.NewDecoder(f).Decode(&vars)
+
+	err = yaml.NewDecoder(f).Decode(&vars)
+
+	if err != nil {
+		err = fmt.Errorf("unable to deserialize file %v due to: %v", file, err)
+	}
+
+	return vars, err
 }

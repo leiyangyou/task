@@ -105,8 +105,16 @@ func readTaskfile(file string) (*taskfile.Taskfile, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var t taskfile.Taskfile
-	return &t, yaml.NewDecoder(f).Decode(&t)
+
+	err = yaml.NewDecoder(f).Decode(&t)
+
+	if err != nil {
+		err = fmt.Errorf("unable to deserialize file %v due to: %v", file, err)
+	}
+
+	return &t, err
 }
 
 func taskNameWithNamespace(taskName string, namespaces ...string) string {

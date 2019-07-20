@@ -275,7 +275,7 @@ func (e *Executor) runDeps(ctx context.Context, t *taskfile.Task, call taskfile.
 		d := d
 
 		g.Go(func() error {
-			err := e.RunTask(ctx, taskfile.Call{Task: d.Task, Vars: call.Vars.Merge(d.Vars)})
+			err := e.RunTask(ctx, taskfile.Call{Task: d.Task, Vars: t.Vars.Merge(d.Vars)})
 			if err != nil {
 				return err
 			}
@@ -291,7 +291,7 @@ func (e *Executor) runCommand(ctx context.Context, t *taskfile.Task, call taskfi
 
 	switch {
 	case cmd.Task != "":
-		err := e.RunTask(ctx, taskfile.Call{Task: cmd.Task, Vars: call.Vars.Merge(cmd.Vars)})
+		err := e.RunTask(ctx, taskfile.Call{Task: cmd.Task, Vars: t.Vars.Merge(cmd.Vars)})
 		if err != nil {
 			return err
 		}

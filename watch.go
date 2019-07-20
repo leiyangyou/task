@@ -45,7 +45,7 @@ func (e *Executor) walkTask(call taskfile.Call, visit func(*taskfile.Task) error
 	}
 
 	for _, d := range task.Deps {
-		err := e.walkTask(taskfile.Call{Task: d.Task, Vars: call.Vars.Merge(d.Vars)}, visit)
+		err := e.walkTask(taskfile.Call{Task: d.Task, Vars: task.Vars.Merge(d.Vars)}, visit)
 
 		if err != nil {
 			return err
@@ -54,7 +54,7 @@ func (e *Executor) walkTask(call taskfile.Call, visit func(*taskfile.Task) error
 
 	for _, c := range task.Cmds {
 		if c.Task != "" {
-			err := e.walkTask(taskfile.Call{Task: c.Task, Vars: call.Vars.Merge(c.Vars)}, visit)
+			err := e.walkTask(taskfile.Call{Task: c.Task, Vars: task.Vars.Merge(c.Vars)}, visit)
 			if err != nil {
 				return err
 			}

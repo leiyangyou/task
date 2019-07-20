@@ -29,7 +29,7 @@ func (e *Executor) CompiledTask(call taskfile.Call) (*taskfile.Task, error) {
 		Generates:   r.ReplaceSlice(origTask.Generates),
 		Status:      r.ReplaceSlice(origTask.Status),
 		Dir:         r.Replace(origTask.Dir),
-		Vars:        nil,
+		Vars:        vars,
 		Env:         nil,
 		Silent:      origTask.Silent,
 		Method:      r.Replace(origTask.Method),
