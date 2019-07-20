@@ -52,6 +52,17 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 		}
 
 		task.Task = nameWithNamespace
+
+		for _, dep := range task.Deps{
+			dep.Vars = t.Vars.Merge(dep.Vars)
+		}
+
+		for _, cmd := range task.Cmds {
+			if cmd.Task != "" {
+				cmd.Vars = t.Vars.Merge(cmd.Vars)
+			}
+		}
+
 	}
 
 	for includedNamespace, includedPath := range t.Includes {

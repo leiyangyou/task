@@ -13,15 +13,13 @@ func Merge(t1, t2 *Taskfile) error {
 	if t2.Expansions != 0 && t2.Expansions != 2 {
 		t1.Expansions = t2.Expansions
 	}
+
 	if t2.Output != "" {
 		t1.Output = t2.Output
 	}
 
 	if t1.Vars == nil {
 		t1.Vars = make(Vars)
-	}
-	for k, v := range t2.Vars {
-		t1.Vars[k] = v
 	}
 
 	if t1.Env == nil {

@@ -14,7 +14,7 @@ var (
 type Vars map[string]Var
 
 func (vs Vars) Merge(another Vars) Vars {
-	var result Vars = make(map[string]Var)
+	var result = make(Vars)
 
 	for k, v := range vs {
 		result[k] = v
