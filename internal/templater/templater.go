@@ -37,6 +37,7 @@ func (r *Templater) Replace(str string) string {
 
 	var b bytes.Buffer
 	if err = templ.Execute(&b, r.strMap); err != nil {
+		log.Printf("unable to execute template: %v: %v", str, r.strMap)
 		r.err = err
 		return ""
 	}

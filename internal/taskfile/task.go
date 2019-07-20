@@ -6,6 +6,7 @@ type Tasks map[string]*Task
 // Task represents a task
 type Task struct {
 	Task         string
+	TaskfileVars Vars
 	Cmds         []*Cmd
 	Deps         []*Dep
 	Desc         string

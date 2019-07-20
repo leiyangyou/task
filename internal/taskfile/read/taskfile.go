@@ -15,7 +15,7 @@ import (
 const NamespaceSeparator = ":"
 
 // Taskfile reads a Taskfile for a given directory
-func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
+func Taskfile(path string, parentVars taskfile.Vars, namespaces ...string) (*taskfile.Taskfile, error) {
 	dir := filepath.Dir(path)
 
 	if _, err := os.Stat(path); err != nil {
@@ -25,6 +25,8 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	t.Vars = parentVars.Merge(t.Vars)
 
 	var taskNames []string
 
@@ -45,24 +47,16 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 		for _, dep := range task.Deps {
 			dep.Task = taskNameWithNamespace(dep.Task, namespaces...)
 		}
+
 		for _, cmd := range task.Cmds {
 			if cmd.Task != "" {
 				cmd.Task = taskNameWithNamespace(cmd.Task, namespaces...)
 			}
 		}
 
+		task.TaskfileVars = t.Vars
+
 		task.Task = nameWithNamespace
-
-		for _, dep := range task.Deps{
-			dep.Vars = t.Vars.Merge(dep.Vars)
-		}
-
-		for _, cmd := range task.Cmds {
-			if cmd.Task != "" {
-				cmd.Vars = t.Vars.Merge(cmd.Vars)
-			}
-		}
-
 	}
 
 	for includedNamespace, includedPath := range t.Includes {
@@ -83,7 +77,7 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 			includedNamespaces = append(namespaces, includedNamespace)
 		}
 
-		includedTaskfile, err := Taskfile(includedPath, includedNamespaces...)
+		includedTaskfile, err := Taskfile(includedPath, t.Vars, includedNamespaces...)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +89,7 @@ func Taskfile(path string, namespaces ...string) (*taskfile.Taskfile, error) {
 	baseTaskName := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
 	path = filepath.Join(dir, fmt.Sprintf("%s_%s.yml", baseTaskName, runtime.GOOS))
 	if _, err = os.Stat(path); err == nil {
-		osTaskfile, err := Taskfile(path, namespaces...)
+		osTaskfile, err := Taskfile(path, t.Vars, namespaces...)
 		if err != nil {
 			return nil, err
 		}

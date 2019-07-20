@@ -88,7 +88,7 @@ func (e *Executor) Run(ctx context.Context, calls ...taskfile.Call) error {
 // Setup setups Executor's internal state
 func (e *Executor) Setup() error {
 	var err error
-	e.Taskfile, err = read.Taskfile(filepath.Join(e.Dir, "Taskfile.yml"))
+	e.Taskfile, err = read.Taskfile(filepath.Join(e.Dir, "Taskfile.yml"), nil)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func (e *Executor) Setup() error {
 func (e *Executor) RunTask(ctx context.Context, call taskfile.Call) error {
 	t, err := e.CompiledTask(call)
 	if err != nil {
-		return err
+		return &taskRunError{call.Task, err}
 	}
 	if !e.Watch && atomic.AddInt32(e.taskCallCount[call.Task], 1) >= MaximumTaskCall {
 		return &MaximumTaskCallExceededError{task: call.Task}

@@ -14,6 +14,14 @@ var (
 type Vars map[string]Var
 
 func (vs Vars) Merge(another Vars) Vars {
+	if vs == nil {
+		return another
+	}
+
+	if another == nil {
+		return vs
+	}
+
 	var result = make(Vars)
 
 	for k, v := range vs {
